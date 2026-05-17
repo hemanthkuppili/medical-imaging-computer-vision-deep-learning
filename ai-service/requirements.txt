@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+tensorflow
+keras
+numpy
+pillow
+python-multipart
+kaggle
+scikit-learn
+python-dotenv
