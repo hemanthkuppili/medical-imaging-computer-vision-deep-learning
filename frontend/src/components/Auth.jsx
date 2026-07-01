@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { Activity, Lock, User, ArrowRight, Sparkles } from 'lucide-react';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
 const Auth = ({ onLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({ username: '', password: '' });
@@ -15,7 +17,7 @@ const Auth = ({ onLogin }) => {
     setLoading(true);
     try {
       const endpoint = isLogin ? '/api/login' : '/api/signup';
-      const res = await axios.post(`http://localhost:5000${endpoint}`, formData);
+      const res = await axios.post(`${API_BASE_URL}${endpoint}`, formData);
       if (res.data.userId) {
         if (isLogin) {
           onLogin({ userId: res.data.userId, username: res.data.username });

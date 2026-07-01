@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Clock, ShieldCheck, ShieldAlert, Brain, Activity, Calendar } from 'lucide-react';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
 const HistoryDashboard = ({ user }) => {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -9,7 +11,7 @@ const HistoryDashboard = ({ user }) => {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/api/history/${user.userId}`);
+        const res = await axios.get(`${API_BASE_URL}/api/history/${user.userId}`);
         setHistory(res.data);
       } catch (err) {
         console.error('Error fetching history', err);

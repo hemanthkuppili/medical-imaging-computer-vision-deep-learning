@@ -4,6 +4,8 @@ import UploadSection from './UploadSection';
 import ResultDisplay from './ResultDisplay';
 import { Brain, Scan, Zap } from 'lucide-react';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
 const SCAN_TYPES = [
   {
     id: 'brain',
@@ -43,7 +45,7 @@ const Dashboard = ({ user }) => {
     formData.append('modelType', modelType);
 
     try {
-      const res = await axios.post('http://localhost:5000/api/predict', formData, {
+      const res = await axios.post(`${API_BASE_URL}/api/predict`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setResult(res.data);
