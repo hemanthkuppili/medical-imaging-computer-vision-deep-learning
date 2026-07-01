@@ -17,24 +17,34 @@ app.use(express.json());
 
 const upload = multer({ dest: 'uploads/' });
 
-// Connect to MongoDB Atlas
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/medical_imaging';
-mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 2000 })
-  .then(() => {
-    console.log('MongoDB connected');
-    mongoose.set('bufferCommands', false); // Disable buffering
-  })
-  .catch(err => console.log('MongoDB is disconnected. Operating in offline history mode!'));
-
 const PYTHON_API_URL = process.env.PYTHON_API_URL || 'http://127.0.0.1:8000';
+const PORT = process.env.PORT || 5000;
 
-// Simple Auth
+let isDbConnected = false;
+
+// ✅ Middleware MUST be defined BEFORE routes in Express
+function requireDb(req, res, next) {
+  if (!isDbConnected) {
+    return res.status(503).json({
+      error: 'Database not connected. Please whitelist your IP in MongoDB Atlas → Security → Network Access.'
+    });
+  }
+  next();
+}
+
+// ✅ Apply DB guard BEFORE defining routes
+app.use('/api/signup', requireDb);
+app.use('/api/login', requireDb);
+app.use('/api/history', requireDb);
+
+// --- Auth Routes ---
 app.post('/api/signup', async (req, res) => {
   try {
     const { username, password } = req.body;
     const existing = await User.findOne({ username });
     if (existing) return res.status(400).json({ error: 'User already exists' });
-    
+
     const user = new User({ username, password });
     await user.save();
     res.json({ message: 'User created successfully', userId: user._id });
@@ -54,7 +64,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// History Endpoint
+// --- History Route ---
 app.get('/api/history/:userId', async (req, res) => {
   try {
     const history = await History.find({ userId: req.params.userId }).sort({ date: -1 });
@@ -64,12 +74,12 @@ app.get('/api/history/:userId', async (req, res) => {
   }
 });
 
-// Predict Endpoint
+// --- Predict Route (works without DB) ---
 app.post('/api/predict', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
-    
-    const { userId, modelType } = req.body; // 'brain' or 'chest'
+
+    const { userId, modelType } = req.body;
     if (!userId || !modelType) {
       fs.unlinkSync(req.file.path);
       return res.status(400).json({ error: 'Missing userId or modelType' });
@@ -80,46 +90,51 @@ app.post('/api/predict', upload.single('image'), async (req, res) => {
     formData.append('file', fs.createReadStream(req.file.path));
 
     const endpoint = modelType === 'brain' ? '/predict/brain' : '/predict/chest';
-    
+
     const pyResponse = await axios.post(`${PYTHON_API_URL}${endpoint}`, formData, {
       headers: formData.getHeaders()
     });
 
     const { prediction, confidence, model } = pyResponse.data;
 
-    // Save history to MongoDB (gracefully handle if MongoDB isn't connected)
-    try {
-      const historyEntry = new History({
-        userId,
-        modelType: model,
-        prediction,
-        confidence
-      });
-      await historyEntry.save();
-    } catch (saveError) {
-      console.warn("Could not save to MongoDB (likely IP not whitelisted or offline), but prediction succeeded:", saveError.message);
+    // Save to MongoDB only if connected (non-blocking)
+    if (isDbConnected) {
+      try {
+        const historyEntry = new History({ userId, modelType: model, prediction, confidence });
+        await historyEntry.save();
+      } catch (saveError) {
+        console.warn('⚠️  Could not save history to MongoDB:', saveError.message);
+      }
     }
 
-    // Clean up uploaded file
     fs.unlinkSync(req.file.path);
 
-    res.json({
-      message: 'Prediction successful',
-      prediction,
-      confidence,
-      model
-    });
+    res.json({ message: 'Prediction successful', prediction, confidence, model });
 
   } catch (err) {
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
+    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     console.error(err);
     res.status(500).json({ error: err.response?.data?.detail || err.message });
   }
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Backend server running on port ${PORT}`);
-});
+// --- Start Server ---
+async function startServer() {
+  // Start HTTP server immediately — don't wait for DB
+  app.listen(PORT, () => {
+    console.log(`🚀 Backend server running on port ${PORT}`);
+  });
+
+  // Attempt MongoDB connection in background
+  try {
+    await mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 8000 });
+    isDbConnected = true;
+    console.log('✅ MongoDB connected successfully!');
+  } catch (err) {
+    console.warn('⚠️  MongoDB connection failed (server still running without DB)');
+    console.warn('   Error:', err.message);
+    console.warn('   👉 Fix: MongoDB Atlas → Security → Network Access → Add IP: 0.0.0.0/0');
+  }
+}
+
+startServer();

@@ -1,34 +1,41 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Activity, LogOut, User, Clock, Home } from 'lucide-react';
+import { Activity, LogOut, LayoutDashboard, Clock } from 'lucide-react';
 
 const Navbar = ({ user, onLogout }) => {
   const location = useLocation();
-
   if (!user) return null;
 
+  const initials = user.username?.slice(0, 2).toUpperCase() || 'U';
+
   return (
-    <nav style={{ padding: '1rem 2rem', background: 'var(--panel-bg)', backdropFilter: 'blur(10px)', borderBottom: '1px solid var(--panel-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <Activity color="var(--accent-color)" size={28} />
-        <h2 style={{ margin: 0, fontSize: '1.5rem', background: 'linear-gradient(to right, #38bdf8, #818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>NeuroScan AI</h2>
+    <nav className="navbar">
+      <div className="navbar-logo">
+        <div className="logo-icon">
+          <Activity color="#fff" size={20} strokeWidth={2.5} />
+        </div>
+        <span className="logo-text">NeuroScan AI</span>
       </div>
-      
-      <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-        <Link to="/dashboard" style={{ color: location.pathname === '/dashboard' ? 'var(--accent-color)' : 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 500, transition: 'color 0.3s' }}>
-          <Home size={18} /> Dashboard
+
+      <div className="navbar-links">
+        <Link to="/dashboard" className={`nav-link ${location.pathname === '/dashboard' ? 'active' : ''}`}>
+          <LayoutDashboard size={16} />
+          Dashboard
         </Link>
-        <Link to="/history" style={{ color: location.pathname === '/history' ? 'var(--accent-color)' : 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 500, transition: 'color 0.3s' }}>
-          <Clock size={18} /> History
+        <Link to="/history" className={`nav-link ${location.pathname === '/history' ? 'active' : ''}`}>
+          <Clock size={16} />
+          History
         </Link>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
-          <User size={18} /> {user.username}
+      <div className="navbar-user">
+        <div className="user-chip">
+          <div className="user-avatar">{initials}</div>
+          {user.username}
         </div>
-        <button onClick={onLogout} className="btn btn-outline" style={{ padding: '8px 12px' }}>
-          <LogOut size={16} /> Logout
+        <button onClick={onLogout} className="btn btn-ghost" style={{ padding: '7px 14px', fontSize: '0.83rem' }}>
+          <LogOut size={15} />
+          Logout
         </button>
       </div>
     </nav>
