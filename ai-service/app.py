@@ -37,6 +37,35 @@ def load_models():
     except Exception as e:
         print(f"Chest model not loaded: {e}")
 
+def validate_scan_type(image_bytes, expected_type):
+    try:
+        image = Image.open(io.BytesIO(image_bytes)).convert('L')
+        img = image.resize((100, 100))
+        arr = np.array(img)
+        
+        # Check corners to estimate background type
+        c = 15
+        tl = arr[0:c, 0:c]
+        tr = arr[0:c, 100-c:100]
+        bl = arr[100-c:100, 0:c]
+        br = arr[100-c:100, 100-c:100]
+        
+        avg_corner = float(np.mean([np.mean(tl), np.mean(tr), np.mean(bl), np.mean(br)]))
+        black_frac = float(np.sum(arr < 15) / 10000.0)
+        
+        # Brain MRI: Dark circular focus with high corner/edge black levels
+        # Chest X-ray: Bright exposure filling most of the sensor
+        detected_type = "brain" if (avg_corner < 28.0 and black_frac > 0.18) else "chest"
+        
+        if detected_type != expected_type:
+            display_expected = "Brain MRI" if expected_type == "brain" else "Chest X-ray"
+            display_detected = "Brain MRI" if detected_type == "brain" else "Chest X-ray"
+            return False, f"Image mismatch: Uploaded scan appears to be a {display_detected}, but '{display_expected}' was selected."
+        
+        return True, None
+    except Exception as e:
+        return True, None # fallback: do not block if parsing fails
+
 def preprocess_image(image_bytes):
     image = Image.open(io.BytesIO(image_bytes))
     image = image.resize((150, 150))
@@ -49,6 +78,11 @@ def preprocess_image(image_bytes):
 @app.post("/predict/brain")
 async def predict_brain(file: UploadFile = File(...)):
     contents = await file.read()
+    
+    # Validate scan type first
+    is_valid, err_msg = validate_scan_type(contents, "brain")
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=err_msg)
     
     if not brain_model:
         # Mock prediction fallback
@@ -67,6 +101,11 @@ async def predict_brain(file: UploadFile = File(...)):
 @app.post("/predict/chest")
 async def predict_chest(file: UploadFile = File(...)):
     contents = await file.read()
+    
+    # Validate scan type first
+    is_valid, err_msg = validate_scan_type(contents, "chest")
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=err_msg)
     
     if not chest_model:
         # Mock prediction fallback
